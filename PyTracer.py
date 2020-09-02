@@ -2,7 +2,7 @@ from __future__ import division
 import platform
 from math import sqrt
 
-class vector:
+class Vector:
 
 	def __init__(self, x = 0.0, y = 0.0, z = 0.0):
 		self.x = x
@@ -22,39 +22,39 @@ class vector:
 		return self / self.magnitude()
 
 	def __add__(self, v):
-		return vector(self.x + v.x, self.y + v.y, self.z + v.z)
+		return Vector(self.x + v.x, self.y + v.y, self.z + v.z)
 		
 	def __sub__(self, v):
-		return vector(self.x - v.x, self.y - v.y, self.z - v.z)
+		return Vector(self.x - v.x, self.y - v.y, self.z - v.z)
 
 	def __rsub__(self, v):
-		return vector(v.x - self.x, v.y - self.y, v.z - self.z)
+		return Vector(v.x - self.x, v.y - self.y, v.z - self.z)
 
 	def __mul__(self, v):
-		if type(v) == vector:
+		if type(v) == Vector:
 			return (self.x * v.x + self.y * v.y + self.z * v.z)
 		elif type(v) in [int, float]:
-			return vector(self.x * v, self.y * v, self.z * v)
+			return Vector(self.x * v, self.y * v, self.z * v)
 
 	def __rmul__(self, v):
-		if type(v) == vector:
+		if type(v) == Vector:
 			return (self.x * v.x + self.y * v.y + self.z * v.z)
 		elif type(v) in [int, float]:
-			return vector(self.x * v, self.y * v, self.z * v)
+			return Vector(self.x * v, self.y * v, self.z * v)
 
 	def __truediv__(self, v):
-		return vector(self.x / v, self.y / v, self.z / v)
+		return Vector(self.x / v, self.y / v, self.z / v)
 
-class point(vector):
+class Point(Vector):
 	pass
 
-class ray():
+class Ray():
 
 	def __init__(self, origin, direction):
 		self.origin = origin
 		self.direction = direction.unit()
 
-class sphere():
+class Sphere():
 
 	def __init__(self, center, radius, material):
 		self.center = center
@@ -74,19 +74,30 @@ class sphere():
 				return dist
 		return None
 
-class camera():
+	def normal(self, position):
+		return (position - self.center).unit()
+
+class Camera():
 
 	def __init__(self, position, direction):
 		self.position = position
 		self.direction = direction
 
-class scene():
+class Light():
 
-	def __init__(self, camera, objects, w, h):
+	def __init__(self, position, c):
+		self.position = position
+		self.color = c
+
+class Scene():
+
+	def __init__(self, camera, lights, objects, w, h, verbose = False):
 		self.camera = camera
+		self.lights = lights
 		self.objects = objects
 		self.w = w
 		self.h = h
+		self.verbose = verbose
 
 	def render(self):
 		aspect_ratio =  self.w / self.h
@@ -98,7 +109,7 @@ class scene():
 		y1 = +1.0 / aspect_ratio
 		y_delta = (y1 - y0) / (self.h - 1)
 
-		pixels = img(self.w, self.h)
+		pixels = Img(self.w, self.h)
 
 		def ray_trace(ray):
 
@@ -114,27 +125,52 @@ class scene():
 				
 				return (dist_min, obj_hit)
 
-			def color_at(obj, pos):
-				return obj.material
+			def color_at(obj, pos, normal, specular_k = 50):
+				m = obj.material
+				obj_c = m.color_at(pos)
+				camv = self.camera - pos
+				c = m.ambient * Color.from_hex("#000000")
 
-			c = color(0, 0, 0)
+				for light in self.lights:
+					lightv = Ray(pos, light.position - pos)
+					c += obj_c * m.diffuse * max(normal * lightv.direction, 0) # Lambert
+					hv = (lightv.direction + camv).unit()
+					c += light.color * m.specular * max(normal * hv, 0) ** specular_k # Blinn-Phong
+
+				return c
+
+			c = Color(0, 0, 0)
 			dist, obj = find_nearest(ray)
 			if obj is None:
 				return c
 			pos = ray.origin + ray.direction * dist
-			c += color_at(obj, pos)
+			normal = obj.normal(pos)
+			c += color_at(obj, pos, normal)
 			return c
 
 		for j in range(self.h):
 			y = y1 - j * y_delta
 			for i in range(self.w):
 				x = x0 + i * x_delta
-				r = ray(self.camera, point(x, y) - self.camera)
+				r = Ray(self.camera, Point(x, y) - self.camera)
 				pixels[j][i] = ray_trace(r)
+			if self.verbose:
+				print("{:3.0f}%".format(float(j)/float(self.h) * 100))
 
 		return pixels
 
-class color(vector):
+class Material():
+
+	def __init__(self, c, ambient = 0.05, diffuse = 1.0, specular = 1.0):
+		self.color = c
+		self.ambient = ambient
+		self.diffuse = diffuse
+		self.specular = specular
+
+	def color_at(self, position):
+		return self.color
+
+class Color(Vector):
 
 	def __init__(self, r, g, b):
 		self.x = r
@@ -159,12 +195,12 @@ class color(vector):
 		else:
 			raise AttributeError
 
-class img():
+class Img():
 
 	def __init__(self, w, h):
 		self.w = w
 		self.h = h
-		self.arr = [[color(0, 0, 0) for _ in range(w)] for _ in range(h)]
+		self.arr = [[Color(0, 0, 0) for _ in range(w)] for _ in range(h)]
 
 	def PPM(self, imgfile, colorspace = 3, cmin = 0, cmax = 255):
 
