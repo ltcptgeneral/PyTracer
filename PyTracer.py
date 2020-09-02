@@ -126,7 +126,7 @@ class scene():
 			return c
 
 		for j in range(self.h):
-			y = y0 + j * y_delta
+			y = y1 - j * y_delta
 			for i in range(self.w):
 				x = x0 + i * x_delta
 				r = ray(self.camera, point(x, y) - self.camera)
