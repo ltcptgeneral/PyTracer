@@ -166,7 +166,7 @@ class Engine():
 		obj_color = material.color_at(hit_pos)
 		to_cam = scene.camera - hit_pos
 		specular_k = 50
-		color = material.ambient * Color.from_hex("#000000")
+		color = material.ambient * Color.from_hex("#FFFFFF")
 		for light in scene.lights:
 			to_light = Ray(hit_pos, light.position - hit_pos)
 			color += (
