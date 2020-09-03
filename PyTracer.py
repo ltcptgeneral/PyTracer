@@ -85,87 +85,114 @@ class Camera():
 
 class Light():
 
-	def __init__(self, position, c):
+	def __init__(self, position, c = None):
 		self.position = position
-		self.color = c
+		if c is not None:
+			self.color = c
+		else:
+			self.color = Color.from_hex("#FFFFFF")
 
 class Scene():
 
-	def __init__(self, camera, lights, objects, w, h, verbose = False):
+	def __init__(self, camera, lights, objects, width, height):
 		self.camera = camera
-		self.lights = lights
 		self.objects = objects
-		self.w = w
-		self.h = h
-		self.verbose = verbose
+		self.lights = lights
+		self.width = width
+		self.height = height
 
-	def render(self):
-		aspect_ratio =  self.w / self.h
+class Engine():
+
+	def __init__(self, max_depth = 5, min_displacement = 0.0001):
+		self.MAX_DEPTH = max_depth
+		self.MIN_DISPLACE = min_displacement
+
+	def render(self, scene):
+		width = scene.width
+		height = scene.height
+		aspect_ratio = float(width) / height
 		x0 = -1.0
 		x1 = +1.0
-		x_delta = (x1 - x0) / (self.w - 1)
-
+		xstep = (x1 - x0) / (width - 1)
 		y0 = -1.0 / aspect_ratio
 		y1 = +1.0 / aspect_ratio
-		y_delta = (y1 - y0) / (self.h - 1)
+		ystep = (y1 - y0) / (height - 1)
 
-		pixels = Img(self.w, self.h)
+		camera = scene.camera
+		pixels = Img(width, height)
 
-		def ray_trace(ray):
-
-			def find_nearest(ray):
-				dist_min = None
-				obj_hit = None
-
-				for obj in self.objects:
-					dist = obj.intersects(ray)
-				if dist is not None and (obj_hit is None or dist < dist_min):
-					dist_min = dist
-					obj_hit = obj
-				
-				return (dist_min, obj_hit)
-
-			def color_at(obj, pos, normal, specular_k = 50):
-				m = obj.material
-				obj_c = m.color_at(pos)
-				camv = self.camera - pos
-				c = m.ambient * Color.from_hex("#000000")
-
-				for light in self.lights:
-					lightv = Ray(pos, light.position - pos)
-					c += obj_c * m.diffuse * max(normal * lightv.direction, 0) # Lambert
-					hv = (lightv.direction + camv).unit()
-					c += light.color * m.specular * max(normal * hv, 0) ** specular_k # Blinn-Phong
-
-				return c
-
-			c = Color(0, 0, 0)
-			dist, obj = find_nearest(ray)
-			if obj is None:
-				return c
-			pos = ray.origin + ray.direction * dist
-			normal = obj.normal(pos)
-			c += color_at(obj, pos, normal)
-			return c
-
-		for j in range(self.h):
-			y = y1 - j * y_delta
-			for i in range(self.w):
-				x = x0 + i * x_delta
-				r = Ray(self.camera, Point(x, y) - self.camera)
-				pixels[j][i] = ray_trace(r)
-			if self.verbose:
-				print("{:3.0f}%".format(float(j)/float(self.h) * 100))
-
+		for j in range(height):
+			y = y1 - (j * ystep)
+			for i in range(width):
+				x = x0 + i * xstep
+				ray = Ray(camera, Point(x, y) - camera)
+				pixels[j][i] = self.ray_trace(ray, scene)
+			print("{:3.0f}%".format(float(j) / float(height) * 100), end="\r")
 		return pixels
+
+	def ray_trace(self, ray, scene, depth = 0):
+		color = Color(0, 0, 0)
+		dist_hit, obj_hit = self.find_nearest(ray, scene)
+		if obj_hit is None:
+			return color
+		hit_pos = ray.origin + ray.direction * dist_hit
+		hit_normal = obj_hit.normal(hit_pos)
+		color += self.color_at(obj_hit, hit_pos, hit_normal, scene)
+
+		if depth < self.MAX_DEPTH:
+			new_ray_pos = hit_pos + hit_normal * self.MIN_DISPLACE
+			new_ray_dir = (
+				ray.direction - 2 * (ray.direction * hit_normal) * hit_normal
+			)
+			new_ray = Ray(new_ray_pos, new_ray_dir)
+			color += (
+				self.ray_trace(new_ray, scene, depth + 1) * obj_hit.material.reflection
+			)
+
+		return color
+
+	def find_nearest(self, ray, scene):
+		dist_min = None
+		obj_hit = None
+		for obj in scene.objects:
+			dist = obj.intersects(ray)
+			if dist is not None and (obj_hit is None or dist < dist_min):
+				dist_min = dist
+				obj_hit = obj
+		return (dist_min, obj_hit)
+
+	def color_at(self, obj_hit, hit_pos, normal, scene):
+		material = obj_hit.material
+		obj_color = material.color_at(hit_pos)
+		to_cam = scene.camera - hit_pos
+		specular_k = 50
+		color = material.ambient * Color.from_hex("#000000")
+		for light in scene.lights:
+			to_light = Ray(hit_pos, light.position - hit_pos)
+			color += (
+				obj_color
+				* material.diffuse
+				* max(normal * to_light.direction, 0)
+			)
+			half_vector = (to_light.direction + to_cam).unit()
+			color += (
+				light.color
+				* material.specular
+				* max(normal * half_vector, 0) ** specular_k
+			)
+		return color
 
 class Material():
 
-	def __init__(self, c, ambient = 0.05, diffuse = 1.0, specular = 1.0):
-		self.color = c
+	def __init__(self, c = None, ambient = 0.05, diffuse = 1.0, specular = 1.0, reflection = 0.5):
+		if c is not None:
+			self.color = c
+		else:
+			self.color = Color.from_hex("#FFFFFF")
 		self.ambient = ambient
 		self.diffuse = diffuse
 		self.specular = specular
+		self.reflection = reflection
 
 	def color_at(self, position):
 		return self.color
