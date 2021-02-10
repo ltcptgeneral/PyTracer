@@ -22,7 +22,7 @@
 	"extensions": [
 		"mhutchie.git-graph",
 		"ms-python.python",
-		"waderyan.gitblame"
+		"waderyan.gitblame",
 	],
-	"postCreateCommand": "apt install vim -y && pip install -r requirements.txt"
+	"postCreateCommand": "pip install -r requirements.txt"
 }
