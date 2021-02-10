@@ -1,4 +1,5 @@
 from .Color import Color
+from .BMP import Bitmap 
 
 class Img():
 
@@ -7,7 +8,9 @@ class Img():
 		self.h = h
 		self.arr = [[Color(0, 0, 0) for _ in range(w)] for _ in range(h)]
 
-	def PPM(self, imgfile, colorspace = 3, cmin = 0, cmax = 255):
+	def PPM(self, PATH, colorspace = 3, cmin = 0, cmax = 255):
+
+		imgfile = open(PATH, "w")
 
 		def to_byte(c):
 			return round(max(min(c * cmax, cmax), cmin))
@@ -18,6 +21,22 @@ class Img():
 			for pixel in row:
 				imgfile.write("{} {} {} ".format(to_byte(pixel.x), to_byte(pixel.y), to_byte(pixel.z)))
 			imgfile.write("\n")
+
+		imgfile.close()
+
+	def BMP(self, PATH, colorspace = 3, cmin = 0, cmax = 255):
+
+		def to_byte(c):
+			return round(max(min(c * cmax, cmax), cmin))
+
+		b = Bitmap(self.w, self.h)
+
+		for i in range(self.h):
+			for j in range (self.w):
+				pixel = self.arr[i][j]
+				b.setPixel(j, self.h - i - 1, (to_byte(pixel.x), to_byte(pixel.y), to_byte(pixel.z)))
+
+		b.write(PATH)
 
 	def __getitem__(self, index):	
 		return self.arr[index]

@@ -1,5 +1,5 @@
 test.ppm
 test.py
 __pycache__/*
-image.ppm
+image.*
 /PyTracer/__pycache__/*
