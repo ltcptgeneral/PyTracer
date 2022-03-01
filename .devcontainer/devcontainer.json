@@ -1,5 +1,5 @@
 {
-    "name": "TRA Analysis Development Environment",
+    "name": "PyTracer Development Environment",
     "build": {
 		"dockerfile": "Dockerfile",
     },
